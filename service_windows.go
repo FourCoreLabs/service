@@ -182,15 +182,31 @@ func (ws *windowsService) Execute(args []string, r <-chan svc.ChangeRequest, cha
 	const cmdsAccepted = svc.AcceptStop | svc.AcceptShutdown
 	changes <- svc.Status{State: svc.StartPending}
 
+	cmdsAcceptedUpdate := cmdsAccepted
+	if ev, ok := ws.Option["ExtraCommandsAccepted"]; ok {
+		if conv, ok := ev.(svc.Accepted); ok {
+			cmdsAcceptedUpdate |= conv
+		}
+	}
+
+	var eventCallback func(svc.ChangeRequest)
+	if f, ok := ws.Option["AcceptedCommandsCallback"]; ok {
+		if conv, ok := f.(func(svc.ChangeRequest)); ok {
+			eventCallback = conv
+		}
+	}
+
 	if err := ws.i.Start(ws); err != nil {
 		ws.setError(err)
 		return true, 1
 	}
-
-	changes <- svc.Status{State: svc.Running, Accepts: cmdsAccepted}
+	changes <- svc.Status{State: svc.Running, Accepts: cmdsAcceptedUpdate}
 loop:
 	for {
 		c := <-r
+		if eventCallback != nil {
+			go eventCallback(c)
+		}
 		switch c.Cmd {
 		case svc.Interrogate:
 			changes <- c.CurrentStatus
