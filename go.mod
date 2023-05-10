@@ -1,4 +1,4 @@
-module github.com/FourCoreLabs/service
+module github.com/fourcorelabs/service
 
 go 1.12
 
